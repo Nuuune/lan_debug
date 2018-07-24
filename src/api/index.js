@@ -8,11 +8,13 @@ axios.defaults.headers.common['token'] = '';
 axios.defaults.headers.common['corpKey'] = '';
 axios.defaults.headers.post['Content-Type'] = 'application/json';
 
-let AUTH_TOKEN = '';
-
 export function set_TOKEN(token) {
   window.localStorage.setItem('lan_token', token);
   axios.defaults.headers.common['token'] = token;
+}
+export function set_CORPKEY(corpkey) {
+  window.localStorage.setItem('lan_corpkey', corpkey);
+  axios.defaults.headers.common['corpKey'] = corpkey;
 }
 
 /**
@@ -20,38 +22,113 @@ export function set_TOKEN(token) {
  * @param  {[string/num]} account  [账户]
  * @param  {[string/num]} password [密码]
  * @return {[promise]}
+ *         成功返回 {login, corp}这两个的状态对象
+ *         失败两种 请求错误 返回请求错误对象
+ *                  服务器错误 返回{code: 5000, errmsg: data.errmsg}
  */
 export function login(account, password) {
-  const instance = new axios.create({
-    baseURL: BASE_URL,
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
-    }
-  });
   return new Promise((resolve, reject) => {
-    instance.post('/api/sso/auth/login', { account: account, password: password })
-    .then(resp => {
-      if (resp.errmsg === 'ok') {
-        set_TOKEN(resp.data.access_token)
-        resolve(resp.errmsg)
+    axios.post('/api/sso/auth/login', { account: account, password: password })
+    .then(({data}) => {
+      if (data.success) {
+        set_TOKEN(data.data.access_token);
+        _getCorpList()
+        .then(cresp => {
+          resolve({
+            login: data.errmsg,
+            corp: cresp
+          })
+        })
+        .catch(err => {
+          resolve({
+            login: data.errmsg,
+            corp: err
+          })
+        })
       } else {
-        reject({code: 5000, errmsg: resp.errmsg})
+        data.errmsg && reject({code: 5000, errmsg: data.errmsg});
       }
     })
     .catch(err => {
-      reject(err)
+      reject(err);
       console.error(err);
     })
   });
 }
 
-function _getCorpList() {
-  axios.get('/api/corp/oa/user/corp/simplelist')
-  .then(resp)
+/**
+ * 获取用户信息
+ * @return {[promise]} 成功 -> 返回服务器的所有data信息
+ *                  失败两种 请求错误 返回请求错误对象
+ *                  服务器错误 返回{code: 5000, errmsg: data.errmsg}
+ */
+export function getSeverUserInfo() {
+  return new Promise((resolve, reject) => {
+    axios.get('/api/corp/oa/user/me')
+    .then(({data}) => {
+      if (data.success) {
+        resolve(data.data)
+      } else {
+        reject({code: 5000, errmsg: data.errmsg})
+      }
+    })
+    .catch(err => {
+      reject(err);
+      console.error(err);
+    })
+  })
+}
 
-    return this.validate(Api.getinit(`${API_URL}/api/corp/oa/user/corp/simplelist`))
-        .then(resp => {
-            return resp.data;
-        });
+/**
+ * 检查token过期
+ * 使用此方法之前需要调用set_TOKEN方法
+ * @return {boolean}
+ */
+export function checkToken() {
+  return new Promise((resolve, reject) => {
+    _getCorpList()
+    .then(res => {
+      if (res === 'ok') {
+        resolve(true);
+      } else {
+        resolve(false);
+      }
+    })
+    .catch(err => {
+      resolve(false);
+    })
+  })
+}
+
+/**
+ * 获取corpkey
+ * 在登陆时调用，内部方法
+ * @return      {[promise]}
+ *              成功返回成功信息
+ *              失败两种 请求错误 返回请求错误对象
+ *              服务器错误 返回{code: 5000, errmsg: data.errmsg}
+ */
+function _getCorpList() {
+  const instance = new axios.create({
+    baseURL: BASE_URL,
+    headers: {
+      'Accept': 'application/json',
+      'token': window.localStorage.getItem("lan_token")
+    }
+  });
+  return new Promise((resolve, reject) => {
+    instance.get('/api/corp/oa/user/corp/simplelist')
+    .then(({data}) => {
+      if (data.success) {
+        set_CORPKEY(data.data[0].id);
+        resolve(data.errmsg);
+      } else {
+        data.errmsg && reject({code: 5000, errmsg: data.errmsg});
+      }
+    })
+    .catch(err => {
+      reject(err);
+      console.error(err);
+    })
+  })
 }

@@ -1,7 +1,7 @@
-import {login} from './api/index.js'
+import Modal from './component/Modal.js'
+import __Landa from './LanDebug.js'
 
-function init() {
-  login(14500000000, 123456)
-}
+import './component/modal.css'
 
-window.load = init();
+window.lan_modal = new Modal();
+new __Landa().init();
