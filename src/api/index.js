@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE_URL = 'http://landa.aosaiban.com';
+const BASE_URL = 'HOST';
 
 axios.defaults.baseURL = BASE_URL;
 axios.defaults.headers.common['Accept'] = 'application/json';
